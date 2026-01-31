@@ -1,6 +1,7 @@
 package tpmseal
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"net"
 	"strconv"
@@ -42,6 +43,55 @@ func TestNoPolicy(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, []byte(dataToSeal), r)
+}
+
+func TestKeySize(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		keySize  int
+		soudFail bool
+	}{
+		{"test_small", 32, false},
+		{"test_max", 128, false},
+		{"test_large", 129, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+
+			key := make([]byte, tc.keySize)
+			rand.Read(key)
+
+			b, err := Seal(&SealConfig{
+				TPMConfig: TPMConfig{
+					TPMPath: swTPMPath,
+				},
+				Parent: H2,
+				Key:    key,
+			})
+			if tc.soudFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+
+				r, err := Unseal(&UnSealConfig{
+					TPMConfig: TPMConfig{
+						TPMPath: swTPMPath,
+					},
+					Parent: H2,
+					Key:    b,
+				})
+				if tc.soudFail {
+					require.Error(t, err)
+				}
+				require.NoError(t, err)
+				require.Equal(t, key, r)
+
+			}
+
+		})
+	}
+
 }
 
 func TestKeyTypes(t *testing.T) {
